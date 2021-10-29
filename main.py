@@ -613,6 +613,7 @@ def await_payment():
         bot.send_message(user_.tg_id,
                          MSGS[user_.language]["PAYMENT_ERROR"])
 
+
 def run_backend():
     print("Backend is running")
     while True:
@@ -635,4 +636,8 @@ if __name__ == '__main__':
     backend = Thread(target=run_backend)
     backend.start()
     print("Bot is running")
-    bot.infinity_polling()
+    while True:
+        try:
+            bot.infinity_polling()
+        except Exception as ex:
+            print(ex)
