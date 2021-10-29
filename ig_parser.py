@@ -42,7 +42,6 @@ class Parser:
         if proxy:
             self.test_proxy()
 
-
     def test_proxy(self):
         r = requests.get("http://icanhazip.com").text
         p = requests.get("http://icanhazip.com", proxies=self.proxies)
@@ -51,7 +50,6 @@ class Parser:
             self.proxies = {}
         else:
             print(f"Proxy connection via {p.text} established")
-
 
     def authorize(self, username, password):
         """Авторизоваться под именем {username} по паролю {password}.
@@ -84,10 +82,9 @@ class Parser:
                 return r.json()
             except json.decoder.JSONDecodeError:
                 print("Instagram redirected to login page")
-                raise Exception()
+                raise IGRedirectError()
         else:
-            print(f"Request status code {r.status_code}, {r.text}")
-            raise Exception()
+            raise NoSuchUserError()
 
     def __post_json(self, url, payload, useragent=None):
         headers = self.headers
@@ -110,9 +107,15 @@ class Parser:
         Возвращает список ссылок"""
 
         user_id = self.get_user_id(login)
+        return self.get_stories_by_uid(user_id)
+
+    def get_stories_by_uid(self, user_id):
         url = f"https://i.instagram.com/api/v1/feed/reels_media/?reel_ids={user_id}"
         j = self.__get_json(url, STORIES_USER_AGENT)
-        items = j["reels"][str(user_id)]["items"]
+        try:
+            items = j["reels"][str(user_id)]["items"]
+        except KeyError:
+            raise NoMaterialsFoundError
         urls = []
         for item in items:
             if item["media_type"] == 1:
@@ -151,6 +154,9 @@ class Parser:
         Возвращает список словарей формата {id, title, thumbnail(url обложки)}"""
 
         user_id = self.get_user_id(login)
+        return self.get_highlights_list_by_uid(user_id)
+
+    def get_highlights_list_by_uid(self, user_id):
         url = f"https://www.instagram.com/graphql/query/?query_hash=c9100bf9110dd6361671f113dd02e7d6&variables=%7B%22user_id%22%3A%22{user_id}%22%2C%22include_chaining%22%3Afalse%2C%22include_reel%22%3Afalse%2C%22include_suggested_users%22%3Afalse%2C%22include_logged_out_extras%22%3Afalse%2C%22include_highlight_reels%22%3Atrue%2C%22include_related_profiles%22%3Afalse%7D"
         j = self.__get_json(url)
         hls = [hl["node"] for hl in j["data"]["user"]["edge_highlight_reels"]["edges"]]
@@ -166,7 +172,11 @@ class Parser:
         items = j["data"]["reels_media"][0]["items"]
         urls = []
         for item in items:
-            url = item["display_url"]
+            if item["__typename"] == "GraphStoryVideo":
+                url = item["video_resources"][-1]["src"]
+            else:
+                url = item["display_url"]
+
             urls.append(url)
         return urls
 
@@ -214,7 +224,7 @@ class Parser:
             post["timestamp"] = node["taken_at_timestamp"]
             if post["id"] not in [post_n["id"] for post_n in posts]:
                 posts.append(post)
-        return posts[start:finish]
+        return posts[start:finish], user_id
 
     def get_posts_by_date(self, login, start_date, fin_date):
         """Получить список постов аккаунта с именем {login} загруженных между датами {start_date} и {fin_date}(дата и время снимка в секундах
@@ -274,6 +284,9 @@ class Parser:
          likes (число лайков), comments(число комментов), timestamp(дата и время поста в секундах
          от начала эпохи)}"""
         user_id = self.get_user_id(login)
+        return self.get_reels_by_uid(user_id, start, finish)
+
+    def get_reels_by_uid(self, user_id, start, finish):
         url = "https://i.instagram.com/api/v1/clips/user/"
         items = []
         has_next_page = True
@@ -308,6 +321,9 @@ class Parser:
          likes (число лайков), comments(число комментов), timestamp(дата и время публикации в секундах
          от начала эпохи)}"""
         user_id = self.get_user_id(login)
+        return self.get_reels_by_date_by_uid(user_id, start_date, fin_date)
+
+    def get_reels_by_date_by_uid(self, user_id, start_date, fin_date):
         url = "https://i.instagram.com/api/v1/clips/user/"
         items = []
         has_next_page = True
@@ -339,5 +355,19 @@ class Parser:
         return reels
 
 
-if __name__ == '__main__':
+class NoSuchUserError(BaseException):
     pass
+
+
+class IGRedirectError(BaseException):
+    pass
+
+
+class NoMaterialsFoundError(BaseException):
+    pass
+
+if __name__ == '__main__':
+    p = Parser("abqu.auto1", "otvertka")
+    a = p.get_posts("danyakraster")
+    for b in a:
+        print(b)

@@ -1,0 +1,11 @@
+bottle==0.12.19
+certifi==2021.10.8
+charset-normalizer==2.0.7
+greenlet==1.1.2
+idna==3.3
+psycopg2==2.9.1
+pysocks5==0.1
+pyTelegramBotAPI==4.1.1
+requests==2.26.0
+SQLAlchemy==1.4.26
+urllib3==1.26.7

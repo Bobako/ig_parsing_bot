@@ -2,7 +2,7 @@ import datetime
 
 import sqlalchemy
 import sqlalchemy.orm
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ARRAY, JSON, desc, asc
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ARRAY, JSON, desc, asc
 from sqlalchemy.ext.declarative import declarative_base
 
 from bot_config import *
@@ -16,8 +16,9 @@ class User(Base):
     username = Column(String)
     language = Column(String)
     premium_till = Column(DateTime)
-    subscriptions_ids = Column(ARRAY)
-    history_ids = Column(ARRAY)
+    subscriptions_ids = Column(JSON)
+    history_ids = Column(JSON)
+    orders_uuids = Column(JSON)
 
     def __init__(self, tg_id: int, username: str, ):
         self.tg_id = tg_id
@@ -26,27 +27,30 @@ class User(Base):
         self.premium_till = datetime.datetime.now() + datetime.timedelta(seconds=TRIAL_PERIOD_SECONDS)
         self.subscriptions_ids = []
         self.history_ids = []
+        self.orders_uuids = []
 
     def add_premium(self, seconds):
+        print(self.premium_till)
         already_premium = self.premium_till - datetime.datetime.now()
+        print(already_premium)
         if already_premium < datetime.timedelta(seconds=0):
             already_premium = datetime.timedelta(seconds=0)
-        self.premium_till = datetime.datetime.now() + already_premium + datetime.timedelta(seconds)
-
+        self.premium_till = datetime.datetime.now() + already_premium + datetime.timedelta(seconds=seconds)
+        print(self.premium_till)
 
 class IGUser(Base):
     __tablename__ = "ig_users"
-    ig_id = Column(Integer, primary_key=True)
+    ig_id = Column(BigInteger, primary_key=True)
     username = Column(String)
     last_posts = Column(JSON)
     last_reels = Column(JSON)
-    last_stories_urls = Column(ARRAY)
+    last_stories_urls = Column(ARRAY(String))
 
     def __init__(self, ig_id, username):
         self.ig_id = ig_id
         self.username = username
-        self.last_posts = {}
-        self.last_stories = {}
+        self.last_posts = []
+        self.last_reels = []
         self.last_stories_urls = []
 
 
@@ -55,6 +59,7 @@ class Handler:
         engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{DB_LOGIN}:{DB_PASSWORD}@{DB_ADDRESS}/{DB_NAME}")
         Base.metadata.create_all(engine)
         self.sessionmaker = sqlalchemy.orm.sessionmaker(bind=engine, expire_on_commit=False)
+        print("Database connected")
 
     def add_user(self, tg_id, username):
         session = self.sessionmaker()
@@ -71,19 +76,36 @@ class Handler:
         session.close()
         return user
 
-    def update_user(self, tg_id, language=None, new_premium_seconds=None, new_subscription=None, new_history_id=None):
+    def update_user(self, tg_id, language=None, new_premium_seconds=None, new_subscription_id=None,
+                    new_history_id=None, remove_subscription_id=None, new_uuid=None):
         session = self.sessionmaker()
         user = session.query(User).filter(User.tg_id == tg_id).one()
         if language:
             user.language = language
         if new_premium_seconds:
             user.add_premium(new_premium_seconds)
-        if new_subscription:
-            if new_subscription not in user.subscriptions_ids:
-                user.subscriptions_ids.append(new_subscription)
+        if new_subscription_id:
+            sub_ids = list(map(int, user.subscriptions_ids))
+            new_sub_id = int(new_subscription_id)
+            if new_sub_id in sub_ids:
+                sub_ids.pop(sub_ids.index(new_sub_id))
+            sub_ids.append(new_sub_id)
+            user.subscriptions_ids = list(sub_ids)
+        session.commit()
         if new_history_id:
-            if new_history_id not in user.history_ids:
-                user.new_history_id.append(new_history_id)
+            history_ids = list(map(int, user.history_ids))
+            new_history_id = int(new_history_id)
+            if new_history_id in history_ids:
+                history_ids.pop(history_ids.index(new_history_id))
+            history_ids.append(new_history_id)
+            user.history_ids = list(history_ids)
+        if remove_subscription_id:
+            sub_ids = list(map(int, user.subscriptions_ids))
+            remove_sub_id = int(new_subscription_id)
+            sub_ids.pop(sub_ids.index(remove_sub_id))
+            user.subscriptions_ids = sub_ids
+        if new_uuid:
+            user.orders_uuids = user.orders_uuids + [new_uuid]
         session.commit()
 
     def add_ig_user(self, ig_id, username):
@@ -91,13 +113,16 @@ class Handler:
         session.add(IGUser(ig_id, username))
         session.commit()
 
-    def get_ig_user(self, username):
+    def get_ig_user(self, username=None, ig_id=None):
         session = self.sessionmaker()
-        user = session.query(IGUser).filter(IGUser.username == username).one()
+        if username:
+            user = session.query(IGUser).filter(IGUser.username == username).one()
+        elif ig_id:
+            user = session.query(IGUser).filter(IGUser.ig_id == ig_id).one()
         session.close()
         return user
 
-    def update_ig_user(self, ig_id, username=None, last_posts=None, last_reels=None, new_story_url=None):
+    def update_ig_user(self, ig_id, username=None, last_posts=None, last_reels=None, new_story_urls=None):
         session = self.sessionmaker()
         user = session.query(IGUser).filter(IGUser.ig_id == ig_id).one()
         if username:
@@ -106,12 +131,26 @@ class Handler:
             user.last_posts = last_posts
         if last_reels:
             user.last_reels = last_reels
-        if new_story_url:
-            user.last_stories_urls.append(new_story_url)
-            if len(user.last_stories_urls) > 100:
-                user.last_stories_urls = user.last_stories_urls[1:]
+        if new_story_urls:
+            for new_story_url in new_story_urls:
+                new_story_url = str(new_story_url)
+                user.last_stories_urls = user.last_stories_urls + [new_story_url]
+                if len(user.last_stories_urls) > 100:
+                    user.last_stories_urls = user.last_stories_urls[1:]
         session.commit()
+
+    def get_premium_users(self):
+        session = self.sessionmaker()
+        users = session.query(User).filter(User.premium_till > datetime.datetime.now()).all()
+        session.close()
+        return users
+
+    def get_users(self):
+        session = self.sessionmaker()
+        users = session.query(User).all()
+        session.close()
+        return users
 
 
 if __name__ == '__main__':
-    h = Handler()
+    pass
