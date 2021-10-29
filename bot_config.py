@@ -1,6 +1,6 @@
 # DATABASE CONFIG
-DB_LOGIN = "alex"
-DB_PASSWORD = "otvertka"
+DB_LOGIN = "DB_LOGIN"
+DB_PASSWORD = "DB_PASSWORD"
 DB_ADDRESS = "localhost"
 DB_NAME = "test_db"
 
@@ -21,15 +21,15 @@ BOT_PAYMENT_ROUTE = "/payment_callback"
 
 
 # BOT CONFIG
-BOT_TOKEN = "2093517269:AAHbdc1UiEzgpkZJQP7njMn3OT8eXAcbm60"
+BOT_TOKEN = "BOT_TOKEN"
 ELEMENTS_PER_PAGE = 9
 REELS_PER_PAGE = 5  # если поставить больше, начианет рассыпаться сообщение при пагинации(
 MAX_SYMBOLS_PREVIEW = 100
 PLACEHOLDER_IMAGE_PATH = "./placeholder.jpg"
 
 # PARSER CONFIG
-IG_LOGIN = 'aleksandr.shishiga'
-IG_PASSWORD = 'otvertka'
+IG_LOGIN = 'IG_LOGIN'
+IG_PASSWORD = 'IG_PASSWORD'
 PROXY_ADDR = None
 SAVE_DIRECTORY = "./media/"
 POSTS_LIMIT = 112
