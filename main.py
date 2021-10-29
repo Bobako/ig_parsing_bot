@@ -71,6 +71,8 @@ def input_username(message):
     if user.premium_till < datetime.datetime.now():
         bot.send_message(sender, MSGS[lang]["PREMIUM_EXPIRED_MSG"])
         return
+
+
     bot.send_message(sender, MSGS[lang]["INPUT_USERNAME_MSG"], reply_markup=get_history_keyboard(h.get_user(sender)))
     if message.text == "/stories":
         bot.register_next_step_handler(message, stories)
@@ -336,8 +338,8 @@ def paginator(user, raw_materials=None, materials=None, pag_msg=None, page_type=
             pag_keys = get_paginator_keyboard(user, mid, page != 1, page < pages, page_type in ["posts", "highlights"],
                                               page)
             pag_msg = bot.send_message(user.tg_id, caption, reply_markup=pag_keys)
-            return media_messages_ids, None
-        return media_messages_ids, pag_msg.id
+            return media_messages_ids, pag_msg.id
+        return media_messages_ids, None
     else:
         for media_id, media in zip(materials.media_message_ids, media):
             bot.edit_message_media(media, user.tg_id, media_id)
@@ -461,6 +463,10 @@ def safe_get(user, method, *args):
 
 
 def get_uid(username, user):
+    if "instagram.com/" in username:
+        username = username[username.find("instagram.com/")+14:]
+        if username[-1] == "/":
+            username = username[:-1]
     uid = 0
     try:
         uid = h.get_ig_user(username).ig_id
@@ -497,7 +503,6 @@ def download_sources(urls):
 
 
 def format_timestamp(timestamp):
-    print(timestamp)
     return datetime.datetime.fromtimestamp(timestamp).strftime("%Y.%m.%d %H:%M")
 
 

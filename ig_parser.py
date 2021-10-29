@@ -180,14 +180,19 @@ class Parser:
             urls.append(url)
         return urls
 
-    def get_posts(self, login, start=0, finish=11):
-        """Получить список постов аккаунта с именем {login} от поста с номером {start}
+    def get_posts(self, username, start=0, finish=11):
+        """Получить список постов аккаунта с именем {username} от поста с номером {start}
          до поста с номером {finish}(не включая). Нумерация начинается от нуля, нулевым является самый свежий пост.
          Формат возвращаемого значения: список словарей формата {id, urls(список адресов контента поста),
          caption(текст поста), likes (число лайков), comments(число комментов), timestamp(дата и время снимка в секундах
          от начала эпохи)}"""
 
-        url = f"https://www.instagram.com/{login}/?__a=1"
+        if "instagram.com/" in username:
+            username = username[username.find("instagram.com/") + 14:]
+            if username[-1] == "/":
+                username = username[:-1]
+
+        url = f"https://www.instagram.com/{username}/?__a=1"
         j = self.__get_json(url)
         user_id = j["graphql"]["user"]["id"]
         nodes = [node["node"] for node in j['graphql']['user']['edge_owner_to_timeline_media']['edges']]
