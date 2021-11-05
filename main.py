@@ -19,7 +19,10 @@ from ig_parser import Parser, IGRedirectError, NoSuchUserError, NoMaterialsFound
 h = database.Handler()
 
 bot = telebot.TeleBot(BOT_TOKEN)
-parser = Parser(IG_LOGIN, IG_PASSWORD, proxy=PROXY_ADDR)
+if USE_COOKIES:
+    parser = Parser(session_id=SESSION_ID, proxy=PROXY_ADDR)
+else:
+    parser = Parser(IG_LOGIN, IG_PASSWORD, proxy=PROXY_ADDR)
 
 MATERIALS = []
 
