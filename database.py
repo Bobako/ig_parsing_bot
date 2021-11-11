@@ -2,7 +2,7 @@ import datetime
 
 import sqlalchemy
 import sqlalchemy.orm
-from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ARRAY, JSON, desc, asc
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ARRAY, JSON, desc, asc, exc
 from sqlalchemy.ext.declarative import declarative_base
 
 from bot_config import *
@@ -38,6 +38,7 @@ class User(Base):
         self.premium_till = datetime.datetime.now() + already_premium + datetime.timedelta(seconds=seconds)
         print(self.premium_till)
 
+
 class IGUser(Base):
     __tablename__ = "ig_users"
     ig_id = Column(BigInteger, primary_key=True)
@@ -54,11 +55,22 @@ class IGUser(Base):
         self.last_stories_urls = []
 
 
+class Client(Base):
+    __tablename__ = "clients"
+    session_id = Column(String, primary_key=True)
+    working = Column(Boolean)
+
+    def __init__(self, session_id):
+        self.session_id = session_id
+        self.working = True
+
+
 class Handler:
     def __init__(self):
         engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{DB_LOGIN}:{DB_PASSWORD}@{DB_ADDRESS}/{DB_NAME}")
         Base.metadata.create_all(engine)
         self.sessionmaker = sqlalchemy.orm.sessionmaker(bind=engine, expire_on_commit=False)
+        self.load_clients()
         print("Database connected")
 
     def add_user(self, tg_id, username):
@@ -151,6 +163,32 @@ class Handler:
         session.close()
         return users
 
+    def load_clients(self):
+        session = self.sessionmaker()
+        with open(IG_ACCS_FILE, "r") as file:
+            for session_id in file:
+                session_id = session_id.replace("\n", "").replace(" ", "")
+                if not session.query(Client).filter(Client.session_id == session_id).first():
+                    session.add(Client(session_id))
+        session.commit()
+
+    def get_client(self):
+        session = self.sessionmaker()
+        client = session.query(Client).filter(Client.working == True).first()
+        session.close()
+        return client
+
+    def mark_client(self, session_id):
+        session = self.sessionmaker()
+        client = session.query(Client).filter(Client.session_id == session_id).one()
+        client.working = False
+        session.commit()
+
+
+class NoMoreAccsAvailable(BaseException):
+    pass
+
 
 if __name__ == '__main__':
-    pass
+    h = Handler()
+    h.load_clients()

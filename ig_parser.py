@@ -372,7 +372,4 @@ class NoMaterialsFoundError(BaseException):
     pass
 
 if __name__ == '__main__':
-    p = Parser("abqu.auto1", "otvertka")
-    a = p.get_posts("danyakraster")
-    for b in a:
-        print(b)
+    pass

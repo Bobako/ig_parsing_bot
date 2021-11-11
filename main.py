@@ -19,10 +19,9 @@ from ig_parser import Parser, IGRedirectError, NoSuchUserError, NoMaterialsFound
 h = database.Handler()
 
 bot = telebot.TeleBot(BOT_TOKEN)
-if USE_COOKIES:
-    parser = Parser(session_id=SESSION_ID, proxy=PROXY_ADDR)
-else:
-    parser = Parser(IG_LOGIN, IG_PASSWORD, proxy=PROXY_ADDR)
+
+CLIENT = h.get_client()
+PARSER = Parser(session_id=CLIENT.session_id, proxy=PROXY_ADDR)
 
 MATERIALS = []
 
@@ -145,7 +144,7 @@ def stories(message):
     if not (uid := get_uid(username, user)):
         return
     wait_message = bot.send_message(user.tg_id, text="⏳", reply_markup=RemoveMarkup())
-    urls = safe_get(user, parser.get_stories_by_uid, uid)
+    urls = safe_get(user, PARSER.get_stories_by_uid, uid)
     if urls:
         paginator(user, urls, page_type="stories")
     bot.delete_message(user.tg_id, wait_message.id)
@@ -155,7 +154,7 @@ def posts(message):
     user = h.get_user(message.from_user.id)
     username = message.text
     wait_message = bot.send_message(user.tg_id, text="⏳", reply_markup=RemoveMarkup())
-    posts, uid = safe_get(user, parser.get_posts, username, 0, POSTS_LIMIT)
+    posts, uid = safe_get(user, PARSER.get_posts, username, 0, POSTS_LIMIT)
     if posts:
         store_uid(uid, username, user)
         paginator(user, posts, page_type="posts")
@@ -168,7 +167,7 @@ def reels(message):
     if not (uid := get_uid(username, user)):
         return
     wait_message = bot.send_message(user.tg_id, text="⏳", reply_markup=RemoveMarkup())
-    reels_ = safe_get(user, parser.get_reels_by_uid, uid, 0, POSTS_LIMIT)
+    reels_ = safe_get(user, PARSER.get_reels_by_uid, uid, 0, POSTS_LIMIT)
     if reels_:
         paginator(user, reels_, page_type="reels")
     bot.delete_message(user.tg_id, wait_message.id)
@@ -180,7 +179,7 @@ def highlights(message):
     if not (uid := get_uid(username, user)):
         return
     wait_message = bot.send_message(user.tg_id, text="⏳", reply_markup=RemoveMarkup())
-    hls = safe_get(user, parser.get_highlights_list_by_uid, uid)
+    hls = safe_get(user, PARSER.get_highlights_list_by_uid, uid)
     if hls:
         paginator(user, hls, page_type="highlights")
     bot.delete_message(user.tg_id, wait_message.id)
@@ -267,7 +266,7 @@ def about(user, mid, post_id):
         wait_message = bot.send_message(user.tg_id, text="⏳", reply_markup=RemoveMarkup())
         highlight = material.materials[post_id]
         hl_id = highlight["id"]
-        urls = safe_get(user, parser.get_highlight_stories, hl_id)
+        urls = safe_get(user, PARSER.get_highlight_stories, hl_id)
 
         about_media_messages_ids, about_caption_message_id = paginator(user, urls, page_type="stories")
         material.about_caption_message_id = about_caption_message_id
@@ -449,15 +448,32 @@ def get_premium_keyboard(user):
 
 
 # other
-def safe_get(user, method, *args):
+def change_client():
+    global CLIENT
+    global PARSER
+    h.mark_client(CLIENT.session_id)
+    cl = h.get_client()
+    if not cl:
+        print("Кончились аккаунты!")
+    else:
+        CLIENT = cl
+        PARSER = Parser(session_id=CLIENT.session_id, proxy=PROXY_ADDR)
+
+
+def safe_get(user, method, *args, first_time=True):
     try:
         result = method(*args)
     except IGRedirectError:
-        if user:
-            bot.send_message(user.tg_id, MSGS[user.language]["IGRedirectError"])
+        if first_time:
+            change_client()
+            return safe_get(user, method, *args, first_time=False)
+        else:
+            print("ЗАКОНЧИЛИСЬ АККАУНТЫ!")
+            if user:
+                bot.send_message(user.tg_id, MSGS[user.language]["NoSuchUserError"])
     except NoSuchUserError:
         if user:
-            bot.send_message(user.tg_id, MSGS[user.language]["NoSuchUserError"])
+            bot.send_message(user.tg_id, MSGS[user.language]["IGRedirectError"])
     except NoMaterialsFoundError:
         if user:
             bot.send_message(user.tg_id, MSGS[user.language]["NoMaterialsFoundError"])
@@ -474,7 +490,7 @@ def get_uid(username, user):
     try:
         uid = h.get_ig_user(username).ig_id
     except sqlalchemy.exc.NoResultFound:
-        uid = safe_get(user, parser.get_user_id, username)
+        uid = safe_get(user, PARSER.get_user_id, username)
         if not uid:
             return
         h.add_ig_user(uid, username)
@@ -559,9 +575,9 @@ def check_for_updates(ig_user, first_time=False):
         return
     username = ig_user.username
     uid = ig_user.ig_id
-    stories_ = safe_get(None, parser.get_stories_by_uid, uid)
-    posts_, _ = safe_get(None, parser.get_posts, username, 0, 11)
-    reels_ = safe_get(None, parser.get_reels_by_uid, uid, 0, 11)
+    stories_ = safe_get(None, PARSER.get_stories_by_uid, uid)
+    posts_, _ = safe_get(None, PARSER.get_posts, username, 0, 11)
+    reels_ = safe_get(None, PARSER.get_reels_by_uid, uid, 0, 11)
 
     if not first_time:
         new_stories = []
