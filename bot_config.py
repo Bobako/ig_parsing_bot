@@ -1,8 +1,8 @@
 # DATABASE CONFIG
-DB_LOGIN = "alex"
-DB_PASSWORD = "otvertka"
+DB_LOGIN = "login"
+DB_PASSWORD = "password"
 DB_ADDRESS = "localhost"
-DB_NAME = "test_db"
+DB_NAME = "ig_bot"
 
 # PREMIUM CONFIGS
 TRIAL_PERIOD_SECONDS = 3600 * 24
@@ -21,7 +21,7 @@ BOT_PAYMENT_ROUTE = "/payment_callback"
 
 
 # BOT CONFIG
-BOT_TOKEN = "2093517269:AAHbdc1UiEzgpkZJQP7njMn3OT8eXAcbm60"
+BOT_TOKEN = ""
 ELEMENTS_PER_PAGE = 9
 REELS_PER_PAGE = 5  # если поставить больше, начианет рассыпаться сообщение при пагинации(
 MAX_SYMBOLS_PREVIEW = 100
